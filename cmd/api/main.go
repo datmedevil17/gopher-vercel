@@ -13,6 +13,9 @@ import (
 	userService "deployment-platform/internal/services/user"
 
 	"github.com/gin-gonic/gin"
+
+	wsHandler "deployment-platform/internal/handlers/websocket"
+	"deployment-platform/internal/services/websocket"
 )
 
 func main() {
@@ -35,8 +38,13 @@ func main() {
 	defer rabbitMQ.Close()
 
 	// Initialize domain services
-	// DeployService needs: db, rmq, s3
-	deployServiceCore := services.NewDeployService(db, rabbitMQ, s3Service)
+
+	// Initialize WebSocket Hub
+	hub := websocket.NewHub()
+	go hub.Run()
+
+	// DeployService needs: db, rmq, s3, hub
+	deployServiceCore := services.NewDeployService(db, rabbitMQ, s3Service, hub)
 
 	usrService := userService.NewService(db)
 	depService := deployerService.NewService(db, deployServiceCore, cfg.BaseDomain)
@@ -44,6 +52,7 @@ func main() {
 	// Initialize handlers
 	userHandler := user.NewHandler(usrService)
 	deployHandler := deployer.NewHandler(depService)
+	websocketHandler := wsHandler.NewHandler(hub)
 
 	r := gin.Default()
 	r.Use(middleware.CORS())
@@ -63,6 +72,7 @@ func main() {
 		api.GET("/deployments", deployHandler.GetDeployments)
 		api.GET("/deployments/:id", deployHandler.GetStatus)
 		api.DELETE("/deployments/:id", deployHandler.DeleteDeployment)
+		api.GET("/deployments/:id/logs", websocketHandler.HandleLogs)
 	}
 
 	log.Printf("Server starting on port 8080")

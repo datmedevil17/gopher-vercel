@@ -10,6 +10,8 @@ import (
 
 	"deployment-platform/internal/models"
 
+	"deployment-platform/internal/services/websocket"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/streadway/amqp"
 	"gorm.io/gorm"
@@ -19,13 +21,15 @@ type DeployService struct {
 	db        *gorm.DB
 	rmq       *RabbitMQ
 	s3Service *S3Service
+	hub       *websocket.Hub
 }
 
-func NewDeployService(db *gorm.DB, rmq *RabbitMQ, s3 *S3Service) *DeployService {
+func NewDeployService(db *gorm.DB, rmq *RabbitMQ, s3 *S3Service, hub *websocket.Hub) *DeployService {
 	service := &DeployService{
 		db:        db,
 		rmq:       rmq,
 		s3Service: s3,
+		hub:       hub,
 	}
 
 	// Start consuming messages
@@ -107,8 +111,9 @@ func (s *DeployService) processDeployment(msg amqp.Delivery) {
 	// Build project
 	deployment.Status = "building"
 	s.db.Save(&deployment)
+	s.hub.BroadcastLog(deployID, "Starting build process...")
 
-	buildLog, err := s.buildProject(tmpDir)
+	buildLog, err := s.buildProject(tmpDir, deployID)
 	deployment.BuildLog = buildLog
 	if err != nil {
 		deployment.Status = "failed"
@@ -147,20 +152,56 @@ func (s *DeployService) cloneRepo(repoURL, destPath string) error {
 	return err
 }
 
-func (s *DeployService) buildProject(projectPath string) (string, error) {
+func (s *DeployService) buildProject(projectPath, deployID string) (string, error) {
 	// Install dependencies
+	s.hub.BroadcastLog(deployID, "Installing dependencies...")
 	installCmd := exec.Command("npm", "install")
 	installCmd.Dir = projectPath
-	installOutput, err := installCmd.CombinedOutput()
+
+	installOutput, err := s.runCommandWithStreaming(installCmd, deployID)
 	if err != nil {
-		return string(installOutput), err
+		return installOutput, err
 	}
 
 	// Build project
+	s.hub.BroadcastLog(deployID, "Building project...")
 	buildCmd := exec.Command("npm", "run", "build")
 	buildCmd.Dir = projectPath
-	buildOutput, err := buildCmd.CombinedOutput()
 
-	fullLog := string(installOutput) + "\n" + string(buildOutput)
+	buildOutput, err := s.runCommandWithStreaming(buildCmd, deployID)
+
+	fullLog := installOutput + "\n" + buildOutput
 	return fullLog, err
+}
+
+func (s *DeployService) runCommandWithStreaming(cmd *exec.Cmd, deployID string) (string, error) {
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+	defer stdout.Close()
+
+	if err := cmd.Start(); err != nil {
+		return "", err
+	}
+
+	var output []byte
+	buf := make([]byte, 1024)
+	for {
+		n, err := stdout.Read(buf)
+		if n > 0 {
+			chunk := buf[:n]
+			output = append(output, chunk...)
+			s.hub.BroadcastLog(deployID, string(chunk))
+		}
+		if err != nil {
+			break
+		}
+	}
+
+	if err := cmd.Wait(); err != nil {
+		return string(output), err
+	}
+
+	return string(output), nil
 }
