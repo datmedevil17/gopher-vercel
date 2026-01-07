@@ -41,6 +41,7 @@ graph TD
 
 ## Component Description
 
+-   **Nginx (Load Balancer)**: Reverse proxy routing traffic to API (`api.localhost`) and Request Handler (`*.localhost`).
 -   **API Server (`cmd/api`)**: Handles user authentication (JWT), deployment requests, and status checks.
 -   **Request Handler (`cmd/request-handler`)**: Serves deployed sites with **Redis caching** and S3 fallback.
 -   **Worker Service**: Processes background deployment tasks (Clone, Build, Upload).
