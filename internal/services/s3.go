@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"mime"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,10 +46,16 @@ func (s *S3Service) UploadFile(filePath, key string) error {
 	}
 	defer file.Close()
 
+	contentType := mime.TypeByExtension(filepath.Ext(filePath))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
 	_, err = s.client.PutObject(context.TODO(), &s3.PutObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(key),
-		Body:   file,
+		Bucket:      aws.String(s.bucket),
+		Key:         aws.String(key),
+		Body:        file,
+		ContentType: aws.String(contentType),
 	})
 
 	return err

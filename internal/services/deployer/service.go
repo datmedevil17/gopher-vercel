@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"gorm.io/gorm"
 	"deployment-platform/internal/models"
 	"deployment-platform/internal/services"
 	"deployment-platform/internal/utils"
+
+	"gorm.io/gorm"
 )
 
 type Service interface {
@@ -20,24 +21,26 @@ type Service interface {
 type service struct {
 	db            *gorm.DB
 	deployService *services.DeployService
+	baseDomain    string
 }
 
-func NewService(db *gorm.DB, deployService *services.DeployService) Service {
+func NewService(db *gorm.DB, deployService *services.DeployService, baseDomain string) Service {
 	return &service{
 		db:            db,
 		deployService: deployService,
+		baseDomain:    baseDomain,
 	}
 }
 
 func (s *service) CreateDeployment(ctx context.Context, userID uint, repoURL string) (*models.Deployment, error) {
 	deployID := utils.GenerateID(8)
-	
+
 	deployment := &models.Deployment{
 		UserID:      userID,
 		DeployID:    deployID,
 		RepoURL:     repoURL,
 		Status:      "pending",
-		DeployedURL: fmt.Sprintf("http://%s.yourdomain.com", deployID),
+		DeployedURL: fmt.Sprintf("http://%s.%s", deployID, s.baseDomain),
 	}
 
 	if err := s.db.Create(deployment).Error; err != nil {

@@ -18,6 +18,12 @@ run: ## Run the application
 run-handler: ## Run the request handler
 	go run ./cmd/request-handler/main.go
 
+run-all: ## Run both API and Request Handler
+	@trap 'kill 0' SIGINT; \
+	go run ./cmd/api/main.go & \
+	go run ./cmd/request-handler/main.go & \
+	wait
+
 test: ## Run tests
 	go test -v ./...
 

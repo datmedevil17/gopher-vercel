@@ -19,13 +19,3 @@ func CORS() gin.HandlerFunc {
 		c.Next()
 	}
 }
-
-func ErrorHandler() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Next()
-
-		if len(c.Errors) > 0 {
-			c.JSON(-1, gin.H{"errors": c.Errors})
-		}
-	}
-}

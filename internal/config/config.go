@@ -1,23 +1,33 @@
 package config
 
-import "os"
+import (
+	"log"
+	"os"
+
+	"github.com/joho/godotenv"
+)
 
 type Config struct {
-	DBHost       string
-	DBPort       string
-	DBUser       string
-	DBPassword   string
-	DBName       string
-	RabbitMQURL  string
-	S3Endpoint   string
-	S3AccessKey  string
-	S3SecretKey  string
-	S3Bucket     string
-	JWTSecret    string
-	Environment  string
+	DBHost      string
+	DBPort      string
+	DBUser      string
+	DBPassword  string
+	DBName      string
+	RabbitMQURL string
+	S3Endpoint  string
+	S3AccessKey string
+	S3SecretKey string
+	S3Bucket    string
+	JWTSecret   string
+	Environment string
+	BaseDomain  string
 }
 
 func LoadConfig() *Config {
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using environment variables")
+	}
+
 	return &Config{
 		DBHost:      getEnv("DB_HOST", "localhost"),
 		DBPort:      getEnv("DB_PORT", "5432"),
@@ -31,6 +41,7 @@ func LoadConfig() *Config {
 		S3Bucket:    getEnv("S3_BUCKET", "deployments"),
 		JWTSecret:   getEnv("JWT_SECRET", "your-secret-key"),
 		Environment: getEnv("ENVIRONMENT", "development"),
+		BaseDomain:  getEnv("BASE_DOMAIN", "localhost:3001"),
 	}
 }
 
