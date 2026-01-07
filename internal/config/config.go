@@ -19,6 +19,7 @@ type Config struct {
 	S3SecretKey string
 	S3Bucket    string
 	JWTSecret   string
+	RedisURL    string
 	Environment string
 	BaseDomain  string
 }
@@ -35,6 +36,7 @@ func LoadConfig() *Config {
 		DBPassword:  getEnv("DB_PASSWORD", "postgres"),
 		DBName:      getEnv("DB_NAME", "deployment_platform"),
 		RabbitMQURL: getEnv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
+		RedisURL:    getEnv("REDIS_URL", "localhost:6379"),
 		S3Endpoint:  getEnv("S3_ENDPOINT", "https://your-r2-endpoint.com"),
 		S3AccessKey: getEnv("S3_ACCESS_KEY", ""),
 		S3SecretKey: getEnv("S3_SECRET_KEY", ""),

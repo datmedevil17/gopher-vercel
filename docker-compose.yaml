@@ -75,12 +75,8 @@ services:
       REDIS_URL: redis:6379
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
       PORT: 3001
-    ports:
-      - "3001:3001"
     depends_on:
       - redis
-    ports:
-      - "3001:3001"
     networks:
       - deployment_network
 

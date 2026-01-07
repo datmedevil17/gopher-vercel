@@ -6,43 +6,47 @@ A simplified clone of the Vercel deployment platform, built with Go. This platfo
 
 ```mermaid
 graph TD
-    User[User] -->|Deploy Request| API[API Server]
-    User -->|Visit Site| Handler[Request Handler]
-    
-    API -->|Store Data| DB[(PostgreSQL)]
-    API -->|Queue Task| RMQ[[RabbitMQ]]
-    
-    subgraph "Worker Service"
-        Worker[Deploy Worker]
-        RMQ -->|Consume| Worker
-        Worker -->|Clone| Git[GitHub/Git Repo]
-        Worker -->|Upload| S3[S3 Storage]
+    User[User] -->|Deploy Request| LB[Load Balancer / Ingress]
+    LB -->|API Traffic| API[API Server]
+    LB -->|Site Traffic| Handler[Request Handler]
+
+    subgraph "Core Services"
+        API -->|Store Metadata| DB[(PostgreSQL)]
+        API -->|Queue Jobs| RMQ[[RabbitMQ]]
     end
-    
-    Handler -->|Fetch File| S3
+
+    subgraph "Worker Layer"
+        Worker[Deploy Worker]
+        RMQ -->|Consume Tasks| Worker
+        Worker -->|Clone| Git[External Git Provider]
+        Worker -->|Upload Source & Artifacts| S3[S3 Storage]
+    end
+
+    subgraph "Edge / Serving Layer"
+        Handler -->|Check Cache| Redis[(Redis Cache)]
+        Redis -.->|Hit| Handler
+        Redis -.->|Miss| Handler
+        Handler -->|Fetch Content| S3
+        Handler -.->|Cache Content| Redis
+    end
+
+    classDef db fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef service fill:#bbf,stroke:#333,stroke-width:2px;
+    classDef ext fill:#ddd,stroke:#333,stroke-width:2px;
+
+    class DB,Redis db;
+    class API,Handler,Worker service;
+    class User,Git,S3 ext;
 ```
 
-## detailed Flow
-
-1.  **Deployment Request**: Authenticated user submits a Github `repo_url` to the API.
-2.  **Queuing**: API creates a pending deployment and pushes a task to RabbitMQ.
-3.  **Processing**: Support worker consumes the task:
-    -   Clones the repository using `go-git`.
-    -   Uploads source files to S3.
-    -   Builds the project (`npm install` & `npm run build`).
-    -   Uploads built artifacts (`dist/`) to S3.
-4.  **Serving**: User visits `http://<deploy-id>.domain.com`.
-    -   `request-handler` service intercepts the request.
-    -   Determines `deploy-id` from the subdomain.
-    -   Fetches and streams the content from S3.
-
-## Components
+## Component Description
 
 -   **API Server (`cmd/api`)**: Handles user authentication (JWT), deployment requests, and status checks.
--   **Worker Service**: Runs within the API (currently) to process background deployment tasks.
--   **Request Handler (`cmd/request-handler`)**: A lightweight service dedicated to serving the deployed static sites.
+-   **Request Handler (`cmd/request-handler`)**: Serves deployed sites with **Redis caching** and S3 fallback.
+-   **Worker Service**: Processes background deployment tasks (Clone, Build, Upload).
 -   **PostgreSQL**: Stores user data and deployment metadata.
 -   **RabbitMQ**: Message broker for asynchronous task processing.
+-   **Redis**: High-performance key-value store for caching static assets.
 -   **S3 (MinIO/R2/AWS)**: Object storage for source code and build artifacts.
 
 ## Getting Started
