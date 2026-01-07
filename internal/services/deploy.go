@@ -8,9 +8,11 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"deployment-platform/internal/models"
+
+	"github.com/go-git/go-git/v5"
 	"github.com/streadway/amqp"
 	"gorm.io/gorm"
-	"deployment-platform/internal/models"
 )
 
 type DeployService struct {
@@ -25,10 +27,10 @@ func NewDeployService(db *gorm.DB, rmq *RabbitMQ, s3 *S3Service) *DeployService 
 		rmq:       rmq,
 		s3Service: s3,
 	}
-	
+
 	// Start consuming messages
 	go service.StartWorker()
-	
+
 	return service
 }
 
@@ -138,8 +140,11 @@ func (s *DeployService) processDeployment(msg amqp.Delivery) {
 }
 
 func (s *DeployService) cloneRepo(repoURL, destPath string) error {
-	cmd := exec.Command("git", "clone", repoURL, destPath)
-	return cmd.Run()
+	_, err := git.PlainClone(destPath, false, &git.CloneOptions{
+		URL:      repoURL,
+		Progress: os.Stdout,
+	})
+	return err
 }
 
 func (s *DeployService) buildProject(projectPath string) (string, error) {
@@ -155,7 +160,7 @@ func (s *DeployService) buildProject(projectPath string) (string, error) {
 	buildCmd := exec.Command("npm", "run", "build")
 	buildCmd.Dir = projectPath
 	buildOutput, err := buildCmd.CombinedOutput()
-	
+
 	fullLog := string(installOutput) + "\n" + string(buildOutput)
 	return fullLog, err
 }

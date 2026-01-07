@@ -3,8 +3,9 @@ package deployer
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"deployment-platform/internal/services/deployer"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
@@ -13,10 +14,6 @@ type Handler struct {
 
 func NewHandler(service deployer.Service) *Handler {
 	return &Handler{service: service}
-}
-
-type DeployRequest struct {
-	RepoURL string `json:"repo_url" binding:"required,url"`
 }
 
 func (h *Handler) Deploy(c *gin.Context) {
@@ -39,8 +36,8 @@ func (h *Handler) Deploy(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"id":          deployment.DeployID,
-		"status":      deployment.Status,
+		"id":           deployment.DeployID,
+		"status":       deployment.Status,
 		"deployed_url": deployment.DeployedURL,
 	})
 }
